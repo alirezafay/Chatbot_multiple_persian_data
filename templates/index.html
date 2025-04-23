@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Chat with Your Bot</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="blurred-text">شرکت توسعه‌ی هتل‌سازی دریا آسیا</div>
+
+  <div class="chat-container">
+    <div class="chat-box">
+      <div class="chat-header" id="chatHeader">ربات هوش مصنوعی شخصی‌سازی‌شده</div>
+
+      <!-- Profile Selection -->
+      <select id="userSelector" onchange="updateProfile()">
+        <option value="user_ahmad">Ahmad</option>
+        <option value="user_sara">Sara</option>
+      </select>
+
+      <div class="chat-messages" id="messages"></div>
+
+      <textarea id="userInput" placeholder="سوال خود را بپرسید..."></textarea>
+      <button onclick="sendMessage()">ارسال</button>
+    </div>
+  </div>
+
+  <script>
+    let chatHistory = [];
+
+    async function updateProfile() {
+      const userId = document.getElementById('userSelector').value;
+      const chatHeader = document.getElementById('chatHeader');
+
+      chatHeader.textContent = userId === 'user_ahmad'
+        ? 'چت با احمد - مدیر کسب‌وکار'
+        : 'چت با سارا - مهندس هوش مصنوعی';
+
+      try {
+        const response = await fetch('/history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId })
+        });
+
+        const data = await response.json();
+        chatHistory = data.history || [];
+        updateChatDisplay();
+      } catch (err) {
+        console.error('خطا در بارگذاری تاریخچه گفتگو:', err);
+      }
+    }
+
+    function formatResponse(text) {
+      return text.replace(/\n/g, '<br>');
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('userInput');
+      const userId = document.getElementById('userSelector').value;
+      const question = input.value.trim();
+
+      if (!question) {
+        alert("لطفاً سوالی وارد کنید!");
+        return;
+      }
+
+      chatHistory.push({ role: 'user', content: question });
+      input.value = '';
+      updateChatDisplay();
+
+      chatHistory.push({ role: 'bot', content: '🤖 در حال پردازش...' });
+      updateChatDisplay();
+
+      try {
+        const response = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: question, user_id: userId })
+        });
+
+        const data = await response.json();
+        const botReply = data.reply || "متأسفم، متوجه نشدم.";
+
+        chatHistory.pop();
+        chatHistory.push({ role: 'bot', content: botReply });
+        updateChatDisplay();
+      } catch (err) {
+        console.error('خطا در ارسال پیام:', err);
+        chatHistory.push({ role: 'bot', content: "خطا در اتصال به سرور." });
+        updateChatDisplay();
+      }
+    }
+
+    function updateChatDisplay() {
+      const messagesDiv = document.getElementById('messages');
+      messagesDiv.innerHTML = '';
+
+      chatHistory.forEach(msg => {
+        const roleClass = msg.role === 'user' ? 'user-message' : 'bot-message';
+        const label = msg.role === 'user' ? 'شما' : 'ربات';
+        const formatted = formatResponse(msg.content);
+        messagesDiv.innerHTML += `<div class="${roleClass}"><strong>${label}:</strong> ${formatted}</div>`;
+      });
+
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    window.onload = () => {
+      updateProfile();
+    };
+  </script>
+</body>
+</html>
